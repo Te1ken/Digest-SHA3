@@ -1,18 +1,13 @@
 use v6;
 
 class Digest::SHA3 {
-	has $.b;
-	has $.c;
+	has $.b = 1600;
 
-	method new(:$b) {
-		self.bless(:$b);
-	}
-
-	method !w() {
+	method !w {
 		floor($.b/25);
 	}
 
-	method !l($b) {
+	method !l {
 		log(floor($.b/25), 2);
 	}
 
@@ -105,7 +100,7 @@ class Digest::SHA3 {
 		my @A2 = @A.values;
 		my @RC = 0 xx $w;
 		for 0..(self!l) -> $j {
-			@RC[(2**$j) - 1] = rc($j + (7 * $i));
+			@RC[(2**$j) - 1] = self!rc($j + (7 * $i));
 		}
 		for ^$w -> $z {
 			@A2[0][0][$z] = @A2[0][0][$z] +^ @RC[$z];
@@ -114,7 +109,7 @@ class Digest::SHA3 {
 	}
 	
 	method !toStateArray(Blob $S) {
-		my $w = self!w()
+		my $w = self!w();
 		my @A;
 		for ^5 -> $x {
 			for ^5 -> $y {
@@ -141,7 +136,7 @@ class Digest::SHA3 {
 	
 	method !keccak-p($S, $b, $n) {
 		my @A = self!toStateArray($S);
-		for (2*l($b) + 12 - $n)..(2 * l($b) + 12 - 1) -> $i {
+		for (2*self!l + 12 - $n)..(2 * self!l + 12 - 1) -> $i {
 			@A = self!iota(self!chi(self!pi(self!rho(self!theta(@A)))), $i);
 		}
 		self!toString(@A);
@@ -153,28 +148,36 @@ class Digest::SHA3 {
 	}
 	
 	method !sponge($M, $d, $r) {
-		my $P = $M ~ self!pad($r, @M.elems);
+		my $P = $M ~ self!pad($r, $M.elems);
 		my $n = $P.elems/$r;
-		my $c = $b - $r; # wtf is $b????
-		my @Pn = gather { take $P[$_*$r..$_*$r+$r-1] for ^($P.elems/$r]; }
-		my $S = 0 xx $b;
+		my $c = $.b - $r;
+		my @Pn = gather { take $P[$_*$r..$_*$r+$r-1] for ^($P.elems/$r); }
+		my $S = buf8.new(0 xx $.b);
 		for ^($n-1) -> $i {
-			$S = self!keccak-p($S ~^ (@P[$i] ~ (0 xx $c)), $b, $n);
+			$S = self!keccak-p($S ~^ ($P[$i] ~ (0 xx $c)), $.b, $n);
 		}
 		my buf8 $Z = buf8.new;
 		until $d <= $Z.elems {
 			$Z ~= $S.subbuf(0,$r);
 			return $Z.subbuf(0,$d) if $d <= $Z.elems;
-			$S = self!keccak-p($S, $b, $n);
+			$S = self!keccak-p($S, $.b, $n);
 		}
 	}
 	
 	method !keccak($c, $M, $d) {
-		self!sponge($M, $d, 
+		self!sponge($M, $d, 1600-$c);
 	}
-	
-	method SHA3_224($M) {
-		keccak(448, $M ~ buf8.new(0,1), 224);
+
+	method !toHex(Blob $b) {
+		gather {
+			take .base(16) for gather { 
+				take [+] (.value * 2 ** (3 - .key) for $b[$_*4..$_*4+3].pairs) for ^($b.elems/4); 
+			} 
+		}.Str.subst(' ', '', :g).lc;
+	}
+
+	method SHA3_224(Blob $M, $d=56) {
+		self!toHex(self!keccak(448, $M ~ buf8.new(0,1), 224).subbuf(0, $d));
 	}
 	
 	method SHA3_256($M) {
@@ -197,4 +200,9 @@ class Digest::SHA3 {
 	
 	}
 }
+
+my $sha = Digest::SHA3.new;
+my $str = "This is the beginning.";
+my $buf = buf8.new(0,1,0,1,0,1,0,0,0,1,1,0,1,0,0,0,0,1,1,0,1,0,0,1,0,1,1,1,0,0,1,1,0,0,1,0,1,1,1,0);
+say $sha.SHA3_224($buf);
 # vim: ft=perl6
