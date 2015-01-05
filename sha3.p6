@@ -95,7 +95,7 @@ class Digest::SHA3 {
 		}
 	}
 	
-	method !iota($i, @A) {
+	method !iota(@A, $i) {
 		my $w = self!w;
 		my @A2 = @A.values;
 		my @RC = 0 xx $w;
@@ -177,7 +177,7 @@ class Digest::SHA3 {
 	}
 
 	method SHA3_224(Blob $M, $d=56) {
-		self!toHex(self!keccak(448, $M ~ buf8.new(0,1), 224).subbuf(0, $d));
+		self!toHex(self!keccak(448, $M ~ buf8.new(0,1), 224).subbuf(0, $d * 4));
 	}
 	
 	method SHA3_256($M) {
