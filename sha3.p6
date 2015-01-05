@@ -18,7 +18,7 @@ class Digest::SHA3 {
 		my @A2 = @A.values;
 		for ^5 -> $x {
 			for ^$w -> $z {
-				@C[$x][$z] = [+^] @A[$x][^5][$z];
+				@C[$x][$z] = [+^] gather { take @A[$x][$_][$z] for ^5; };
 			}
 		}
 		for ^5 -> $x {
@@ -151,10 +151,10 @@ class Digest::SHA3 {
 		my $P = $M ~ self!pad($r, $M.elems);
 		my $n = $P.elems/$r;
 		my $c = $.b - $r;
-		my @Pn = gather { take $P[$_*$r..$_*$r+$r-1] for ^($P.elems/$r); }
+		my @Pn = gather { take $P.subbuf($_*$r, $_*$r+$r) for ^($P.elems/$r); }
 		my $S = buf8.new(0 xx $.b);
-		for ^($n-1) -> $i {
-			$S = self!keccak-p($S ~^ ($P[$i] ~ (0 xx $c)), $.b, $n);
+		for ^$n -> $i {
+			$S = self!keccak-p($S ~^ (@Pn[$i] ~ buf8.new(0 xx $c)), $.b, $n);
 		}
 		my buf8 $Z = buf8.new;
 		until $d <= $Z.elems {
@@ -165,7 +165,7 @@ class Digest::SHA3 {
 	}
 	
 	method !keccak($c, $M, $d) {
-		self!sponge($M, $d, 1600-$c);
+		self!sponge($M, $d, $.b-$c);
 	}
 
 	method !toHex(Blob $b) {
