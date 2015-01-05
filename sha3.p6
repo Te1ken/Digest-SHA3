@@ -85,10 +85,10 @@ class Digest::SHA3 {
 			my @R = @(1,0,0,0,0,0,0,0);
 			for 1..($t % 255) -> $i {
 				unshift @R, 0;
-				@R[0] = @R[0] + @R[8];
-				@R[4] = @R[4] + @R[8];
-				@R[5] = @R[5] + @R[8];
-				@R[6] = @R[6] + @R[8];
+				@R[0] = @R[0] +^ @R[8];
+				@R[4] = @R[4] +^ @R[8];
+				@R[5] = @R[5] +^ @R[8];
+				@R[6] = @R[6] +^ @R[8];
 				@R = @R[0..7];
 			}
 			@R[0];
@@ -134,10 +134,11 @@ class Digest::SHA3 {
 		$S;
 	}
 	
-	method !keccak-p($S, $b, $n) {
+	method !keccak-p($S, $n) {
 		my @A = self!toStateArray($S);
 		for (2*self!l + 12 - $n)..(2 * self!l + 12 - 1) -> $i {
 			@A = self!iota(self!chi(self!pi(self!rho(self!theta(@A)))), $i);
+			say $i;
 		}
 		self!toString(@A);
 	}
@@ -154,13 +155,13 @@ class Digest::SHA3 {
 		my @Pn = gather { take $P.subbuf($_*$r, $_*$r+$r) for ^($P.elems/$r); }
 		my $S = buf8.new(0 xx $.b);
 		for ^$n -> $i {
-			$S = self!keccak-p($S ~^ (@Pn[$i] ~ buf8.new(0 xx $c)), $.b, $n);
+			$S = self!keccak-p($S ~^ (@Pn[$i] ~ buf8.new(0 xx $c)), 24);
 		}
 		my buf8 $Z = buf8.new;
 		until $d <= $Z.elems {
 			$Z ~= $S.subbuf(0,$r);
 			return $Z.subbuf(0,$d) if $d <= $Z.elems;
-			$S = self!keccak-p($S, $.b, $n);
+			$S = self!keccak-p($S, $n);
 		}
 	}
 	
@@ -168,7 +169,7 @@ class Digest::SHA3 {
 		self!sponge($M, $d, $.b-$c);
 	}
 
-	method !toHex(Blob $b) {
+	method !toHex(Blob $b) { 
 		gather {
 			take .base(16) for gather { 
 				take [+] (.value * 2 ** (3 - .key) for $b[$_*4..$_*4+3].pairs) for ^($b.elems/4); 
